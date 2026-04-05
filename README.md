@@ -20,41 +20,27 @@ Two completely different interfaces from a single codebase — powered by role-b
 
 ## 🏗 Architecture
 
-```mermaid
-flowchart TB
-    User([👤 User]) --> React
+| Layer | Technology | Hosted On | Role |
+|-------|-----------|-----------|------|
+| 🖥 **Frontend** | React + Tailwind CSS | Vercel | UI, routing, auth state |
+| 🔥 **Auth** | Firebase Auth | Google Cloud | Login, register, sessions, password reset |
+| 🚀 **Backend** | Express.js (Node) | Render | REST API, business logic, file handling |
+| 🍃 **Database** | MongoDB Atlas | AWS | 7 collections, all business data |
+| 💳 **Payments** | Stripe (test mode) | Stripe | Payment intents, invoice processing |
 
-    subgraph Frontend ["Frontend — Vercel"]
-        React["⚛️ React + Tailwind CSS"]
-    end
+### How it connects
 
-    subgraph Auth ["Authentication"]
-        Firebase["🔥 Firebase Auth\nLogin · Register · Sessions"]
-    end
-
-    subgraph Backend ["Backend — Render"]
-        Express["🚀 Express.js\n20+ REST API Endpoints"]
-    end
-
-    subgraph Database ["Database"]
-        MongoDB[("🍃 MongoDB Atlas\n7 Collections")]
-    end
-
-    subgraph Payments ["Payments"]
-        Stripe["💳 Stripe\nTest Mode"]
-    end
-
-    React <--> Firebase
-    React <--> Express
-    Express <--> MongoDB
-    Express <--> Stripe
+```
+👤 User
+ ↓
+⚛️ React (Vercel) ←——→ 🔥 Firebase Auth (sessions + credentials)
+ ↓
+🚀 Express API (Render) ←——→ 💳 Stripe (payments)
+ ↓
+🍃 MongoDB Atlas (users, projects, invoices, agreements, timeline, deliverables, reports)
 ```
 
-### How it works
-
-> **User** → **React** renders the UI → **Firebase** handles login/register/sessions → **Express** processes all business logic → **MongoDB** stores data → **Stripe** handles payments
-
-**Key architectural decision:** Firebase handles authentication (sessions, password hashing, password reset emails) while MongoDB stores all business data (user profiles with roles, projects, invoices). They're linked by `firebaseUid` — giving us Firebase's simplicity with MongoDB's flexibility.
+> **Key decision:** Firebase handles auth (password hashing, sessions, reset emails). MongoDB stores business data (roles, projects, invoices). Linked by `firebaseUid` — Firebase's simplicity + MongoDB's flexibility.
 
 ### Data Flow
 
@@ -107,46 +93,18 @@ flowchart TB
 
 ## 📦 MongoDB Schema
 
-```mermaid
-erDiagram
-    USERS ||--|| PROJECTS : "has one"
-    PROJECTS ||--o{ AGREEMENTS : "has many"
-    PROJECTS ||--o{ INVOICES : "has many"
-    PROJECTS ||--o{ TIMELINE : "has many"
-    PROJECTS ||--o{ DELIVERABLES : "has many"
-    PROJECTS ||--o{ REPORTS : "has many"
+```
+USERS ←——→ PROJECTS
+              ├── AGREEMENTS    (e-signatures, terms)
+              ├── INVOICES      (line items, Stripe payments)
+              ├── TIMELINE      (milestones, phases)
+              ├── DELIVERABLES  (file uploads/downloads)
+              └── REPORTS       (monthly performance)
 
-    USERS {
-        ObjectId _id
-        string firebaseUid
-        string name
-        string email
-        string role
-        ObjectId projectId
-    }
-    PROJECTS {
-        ObjectId _id
-        ObjectId clientId
-        string projectName
-        string status
-        string currentPhase
-    }
-    AGREEMENTS {
-        ObjectId _id
-        ObjectId projectId
-        string title
-        array terms
-        string status
-        string signatureName
-    }
-    INVOICES {
-        ObjectId _id
-        ObjectId projectId
-        string invoiceNumber
-        array items
-        number total
-        string status
-    }
+Link: USERS.firebaseUid ←→ Firebase Auth
+Link: USERS.projectId ←→ PROJECTS._id
+Link: PROJECTS.clientId ←→ USERS._id
+All other collections link via projectId
 ```
 
 | Collection | Key Fields |
