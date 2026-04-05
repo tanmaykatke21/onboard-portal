@@ -279,7 +279,7 @@ Full payment infrastructure is implemented and production-ready. Switching to li
 
 **Tanmay Katke**
 - GitHub: [@tanmaykatke21](https://github.com/tanmaykatke21)
-- LinkedIn: [linkedin.com/in/tanmaykatke](https://linkedin.com/in/tanmaykatke)
+- LinkedIn: [linkedin.com/in/tanmaykatke21](https://linkedin.com/in/tanmaykatke21)
 
 ---
 
