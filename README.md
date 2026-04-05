@@ -20,33 +20,52 @@ Two completely different interfaces from a single codebase — powered by role-b
 
 ## 🏗 Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                      FRONTEND                           │
-│              React + Tailwind CSS (Vercel)               │
-│                                                         │
-│   Auth Pages ─── Admin Dashboard ─── Client Portal      │
-│       │               │                    │            │
-│       ▼               ▼                    ▼            │
-│   Firebase Auth   Express API         Express API       │
-│   (login/register) (CRUD ops)         (CRUD ops)        │
-└───────┬───────────────┬────────────────────┘            │
-        │               │                                  │
-        ▼               ▼                                  │
-   ┌─────────┐   ┌──────────────┐   ┌──────────┐         │
-   │ Firebase │   │   Express.js  │   │  Stripe  │         │
-   │   Auth   │   │   (Render)    │   │ Payments │         │
-   └─────────┘   └──────┬───────┘   └──────────┘         │
-                         │                                 │
-                         ▼                                 │
-                  ┌──────────────┐                         │
-                  │ MongoDB Atlas │                         │
-                  │  (7 collections)│                       │
-                  └──────────────┘                         │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    User([👤 User]) --> React
+
+    subgraph Frontend ["Frontend — Vercel"]
+        React["⚛️ React + Tailwind CSS"]
+    end
+
+    subgraph Auth ["Authentication"]
+        Firebase["🔥 Firebase Auth\nLogin · Register · Sessions"]
+    end
+
+    subgraph Backend ["Backend — Render"]
+        Express["🚀 Express.js\n20+ REST API Endpoints"]
+    end
+
+    subgraph Database ["Database"]
+        MongoDB[("🍃 MongoDB Atlas\n7 Collections")]
+    end
+
+    subgraph Payments ["Payments"]
+        Stripe["💳 Stripe\nTest Mode"]
+    end
+
+    React <--> Firebase
+    React <--> Express
+    Express <--> MongoDB
+    Express <--> Stripe
 ```
 
-**Key architectural decision:** Firebase handles authentication (sessions, password hashing, Google sign-in) while MongoDB stores all business data (user profiles with roles, projects, invoices). They're linked by `firebaseUid` — giving us Firebase's simplicity with MongoDB's flexibility.
+### How it works
+
+> **User** → **React** renders the UI → **Firebase** handles login/register/sessions → **Express** processes all business logic → **MongoDB** stores data → **Stripe** handles payments
+
+**Key architectural decision:** Firebase handles authentication (sessions, password hashing, password reset emails) while MongoDB stores all business data (user profiles with roles, projects, invoices). They're linked by `firebaseUid` — giving us Firebase's simplicity with MongoDB's flexibility.
+
+### Data Flow
+
+| Action | Flow |
+|--------|------|
+| **Register** | React → Firebase (create account) → Express → MongoDB (save profile with role) |
+| **Login** | React → Firebase (verify credentials, return UID) → Express → MongoDB (fetch profile with role) |
+| **Add Client** | React → Firebase (create account + send password reset email) → Express → MongoDB (create user + project, link both) |
+| **Pay Invoice** | React → Express → Stripe (create payment intent) → Express → MongoDB (mark invoice paid) |
+| **Sign Agreement** | React → Express → MongoDB (update status, log signature + timestamp + IP) |
+| **Page Refresh** | Firebase `onAuthStateChanged` auto-detects session → Express → MongoDB (fetch profile) |
 
 ---
 
@@ -88,16 +107,46 @@ Two completely different interfaces from a single codebase — powered by role-b
 
 ## 📦 MongoDB Schema
 
-```
-users ──────────── projects
-  │                    │
-  │                    ├── agreements
-  │                    ├── invoices
-  │                    ├── timeline
-  │                    ├── deliverables
-  │                    └── reports
-  │
-  └── firebaseUid (links to Firebase Auth)
+```mermaid
+erDiagram
+    USERS ||--|| PROJECTS : "has one"
+    PROJECTS ||--o{ AGREEMENTS : "has many"
+    PROJECTS ||--o{ INVOICES : "has many"
+    PROJECTS ||--o{ TIMELINE : "has many"
+    PROJECTS ||--o{ DELIVERABLES : "has many"
+    PROJECTS ||--o{ REPORTS : "has many"
+
+    USERS {
+        ObjectId _id
+        string firebaseUid
+        string name
+        string email
+        string role
+        ObjectId projectId
+    }
+    PROJECTS {
+        ObjectId _id
+        ObjectId clientId
+        string projectName
+        string status
+        string currentPhase
+    }
+    AGREEMENTS {
+        ObjectId _id
+        ObjectId projectId
+        string title
+        array terms
+        string status
+        string signatureName
+    }
+    INVOICES {
+        ObjectId _id
+        ObjectId projectId
+        string invoiceNumber
+        array items
+        number total
+        string status
+    }
 ```
 
 | Collection | Key Fields |
